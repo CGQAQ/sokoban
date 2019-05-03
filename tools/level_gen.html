@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+        <title>Level generator</title>
+
+        <script src="../src/lib/lvl_maker.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.9/vue.min.js"></script>
+
+        <style>
+            #header {
+                width: 80%;
+                margin: 1rem auto;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+
+            #dimension {
+                display: flex;
+                flex-direction: column;
+                width: 20%;
+            }
+
+            hr {
+                width: 100%;
+                margin: 0.1em auto;
+                background: #333;
+                height: 0.5em;
+            }
+
+            .gone {
+                display: none;
+            }
+
+            [type="radio"]:checked + label {
+                outline: 5px solid rgb(8, 182, 212);
+            }
+
+            #options {
+                display: grid;
+                grid-template-columns: repeat(5, 1fr);
+                align-items: center;
+                grid-column-gap: 1em;
+                margin-left: 2em;
+            }
+
+            .row {
+                display: flex;
+                justify-content: center;
+            }
+
+            .cell {
+                border: 1px solid #333;
+            }
+
+            #main {
+                margin-top: 2em;
+            }
+
+            .radio-des {
+                text-align: center;
+                background-color: aquamarine;
+            }
+
+            .btn {
+                height: 5em;
+                margin-left: 1em;
+                background: #555;
+            }
+
+            .btn:active {
+                background: #777;
+            }
+
+            .btn:hover {
+                outline: #333 solid 0.5em;
+                outline-offset: 0.2em;
+            }
+            #options + .btn {
+                background: rgba(216, 71, 71, 0.959);
+            }
+        </style>
+    </head>
+
+    <body>
+        <section id="container" @mouseup="mup" @mouseleave="mup">
+            <section id="header">
+                <section id="dimension">
+                    <label for="unit">Unit(px)</label>
+                    <input
+                        type="number"
+                        min="3"
+                        pattern="\d*"
+                        id="unit"
+                        v-model.number="unit"
+                    />
+                    <hr />
+                    <label for="width">width(ut.)</label>
+                    <input
+                        type="number"
+                        min="5"
+                        pattern="\d*"
+                        id="width"
+                        v-model.number="width"
+                    />
+                    <hr />
+                    <label for="height">height(ut.)</label>
+                    <input
+                        type="number"
+                        min="5"
+                        pattern="\d*"
+                        id="height"
+                        v-model.number="height"
+                    />
+                </section>
+                <section id="options">
+                    <span v-for="i in options">
+                        <input
+                            type="radio"
+                            v-model="choice"
+                            :value="i.url"
+                            name="opt"
+                            :id="i.name.toLowerCase()"
+                            class="gone"
+                        />
+                        <label :for="i.name.toLowerCase()">
+                            <img :src="i.url" alt="ground" />
+                            <div class="radio-des">{{ i.name }}</div>
+                        </label>
+                    </span>
+                </section>
+                <button class="btn" @click="initDataList">Clear</button>
+                <button class="btn" @click="loadClicked">
+                    Load from clipboard
+                </button>
+                <button class="btn" @click="genClicked">Gen and copy</button>
+            </section>
+            <section id="main">
+                <div class="row" v-for="(x, i) in mapData" :n="i">
+                    <div
+                        class="cell"
+                        @mousedown="mdown"
+                        @mouseover="mover"
+                        :style="{width: unit + 'em', height: unit + 'em', 'background-size': 'cover' , 'background-image': `url(${y === 0? '': options[y-1].url})`}"
+                        v-for="(y, j) in x"
+                        :key="j"
+                        :n="j"
+                    ></div>
+                </div>
+            </section>
+        </section>
+
+        <script id="vue-script">
+            Vue.config.devtools = true;
+            const instance = new Vue({
+                el: "#container",
+                data: {
+                    unit: 3,
+                    width: 10,
+                    height: 10,
+
+                    md: false,
+
+                    ignoreChanges: false,
+
+                    choice: null,
+                    mapData: [], // raw data for the game
+
+                    options: [
+                        {
+                            url: "../src/assets/imgs/Ground/ground_06.png",
+                            name: "Ground",
+                        },
+                        {
+                            url: "../src/assets/imgs/Blocks/block_01.png",
+                            name: "Wall",
+                        },
+                        {
+                            url: "../src/assets/imgs/Crates/crate_04.png",
+                            name: "Box",
+                        },
+                        {
+                            url:
+                                "../src/assets/imgs/Environment/environment_08.png",
+                            name: "Goal",
+                        },
+                        {
+                            url: "../src/assets/imgs/Player/player_05.png",
+                            name: "Gamer",
+                        },
+                    ],
+
+                    tiles: {
+                        wall: [
+                            [
+                                "block_04.png", //flat
+                                "block_05.png", //flat
+                                "block_06.png", //flat
+                                "block_07.png", //flat
+                            ],
+                            [
+                                "block_01.png",
+                                "block_02.png",
+                                "block_03.png",
+                                "block_08.png",
+                            ],
+                        ],
+                        ground: [],
+                        box: [],
+                        others: [], // point and bonus(which not available)
+                    },
+                },
+                mounted: function() {
+                    this.initDataList();
+                },
+                updated: function() {
+                    this.ignoreChanges = false;
+                },
+                watch: {
+                    width: function() {
+                        this.initDataList();
+                    },
+                    height: function() {
+                        this.initDataList();
+                    },
+                },
+                methods: {
+                    cellClicked: function(event) {
+                        let e = event.target;
+                        let y = e.getAttribute("n");
+                        let x = e.parentNode.getAttribute("n");
+                        let choice =
+                            this.options.findIndex(i => i.url === this.choice) +
+                            1;
+                        if (
+                            this.mapData[x][y] === choice ||
+                            this.choice === null
+                        ) {
+                            // event.target.style.backgroundImage = '';
+                            this.mapData[x].splice(y, 1, 0);
+                        } else {
+                            if (
+                                choice === 5 &&
+                                this.mapData.flat().includes(5)
+                            ) {
+                                alert(
+                                    "Only 1 character could have in one single game!"
+                                );
+                                return;
+                            }
+                            // event.target.style.backgroundImage = `url('${this.choice}')`;
+                            // event.target.style.backgroundSize = 'cover';
+                            this.mapData[x].splice(y, 1, choice);
+                        }
+                    },
+
+                    // drag to select
+                    mdown: function(e) {
+                        e.preventDefault();
+                        this.md = true;
+                        this.cellClicked(e);
+                    },
+                    mup: function() {
+                        this.md = false;
+                    },
+                    mover: function(e) {
+                        if (this.md) {
+                            // console.log('select', e)
+                            this.cellClicked(e);
+                        }
+                    },
+
+                    loadClicked: async function() {
+                        this.ignoreChanges = true;
+                        let obj = load(await navigator.clipboard.readText());
+                        if (obj === null) {
+                            alert("Not a valid lvl format in clipboard!");
+                            ignoreChanges = false;
+                            return;
+                        }
+                        let { unit, width, height, data } = obj;
+
+                        this.unit = unit;
+                        this.width = width;
+                        this.height = height;
+                        this.mapData = data;
+                    },
+
+                    genClicked: function(e) {
+                        navigator.clipboard.writeText(
+                            generate(
+                                this.unit,
+                                this.width,
+                                this.height,
+                                this.mapData
+                            )
+                        );
+                    },
+                    initDataList: function() {
+                        if (this.ignoreChanges) return;
+                        this.mapData = [];
+                        for (let a = 0; a < this.height; a++) {
+                            Vue.set(
+                                this.mapData,
+                                a,
+                                new Array(this.width - 0).fill(0)
+                            );
+                        }
+                    },
+                },
+            });
+        </script>
+    </body>
+</html>

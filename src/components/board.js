@@ -1,242 +1,295 @@
-import React, { useState, useEffect, useMemo } from "react";
-import _ from "lodash";
+import React, { useState, useEffect, useMemo } from 'react';
+import _ from 'lodash';
 
-import getMapData from "../lvl/index";
+import getMapData from '../lvl/index';
 
-import { Cell } from "./cell";
+import { Cell } from './cell';
 
-import { genTiles, dataToTile } from "./resourses";
+import { genTiles, dataToTile, ObjType } from './resourses';
+import { objectExpression } from '@babel/types';
 
 function useInit({ setGameData, setLevel }) {
-    useEffect(() => {
-        setLevel(1);
-        // eslint-disable-next-line
-    }, []);
+	useEffect(() => {
+		setLevel(1);
+		// eslint-disable-next-line
+	}, []);
 }
 
 const PlayerOrientation = {
-    up: "UP",
-    down: "DOWN",
-    left: "LEFT",
-    right: "RIGHT",
+	up: 'UP',
+	down: 'DOWN',
+	left: 'LEFT',
+	right: 'RIGHT',
 };
 
+const MoveDirection = PlayerOrientation;
+
 const KeyCode = {
-    up: "ArrowUp",
-    down: "ArrowDown",
-    left: "ArrowLeft",
-    right: "ArrowRight",
+	up: 'ArrowUp',
+	down: 'ArrowDown',
+	left: 'ArrowLeft',
+	right: 'ArrowRight',
 };
 
 function useKey(concernedKey, gap) {
-    const [counter, setCounter] = useState(0);
+	const [counter, setCounter] = useState(0);
 
-    let inter = null;
+	let inter = null;
 
-    if (!gap) gap = 500;
+	if (!gap) gap = 500;
 
-    const keydownHandler = function(ev) {
-        // console.log(inter, ev.code, concernedKey);
-        if (!inter && ev.code === concernedKey) {
-            setCounter(c => c + 1);
-            inter = setInterval(() => {
-                setCounter(c => c + 1);
-            }, gap);
-        }
-    };
-    const keyupHandler = function(ev) {
-        if (ev.code === concernedKey) {
-            setCounter(0);
-            clearInterval(inter);
-            inter = null;
-        }
-    };
+	const keydownHandler = function(ev) {
+		// console.log(inter, ev.code, concernedKey);
 
-    useEffect(() => {
-        window.addEventListener("keydown", keydownHandler, { capture: true });
-        window.addEventListener("keyup", keyupHandler, { capture: true });
+		if (!inter && ev.code === concernedKey) {
+			if (!inter) {
+				setCounter(c => c + 1);
+			}
+			inter = setInterval(() => {
+				setCounter(c => c + 1);
+			}, gap);
+		}
+	};
+	const keyupHandler = function(ev) {
+		if (ev.code === concernedKey) {
+			setCounter(0);
+			clearInterval(inter);
+			inter = null;
+		}
+	};
 
-        return () => {
-            window.removeEventListener("keydown", keydownHandler);
-            window.removeEventListener("keydown", keyupHandler);
-        };
-    });
+	useEffect(() => {
+		window.addEventListener('keydown', keydownHandler);
+		window.addEventListener('keyup', keyupHandler);
 
-    return counter;
+		return () => {
+			window.removeEventListener('keydown', keydownHandler);
+			window.removeEventListener('keydown', keyupHandler);
+		};
+	}, []);
+
+	return counter;
 }
 
-const objType = {
-    block: 2, // 2
-    box: 3, // 3  .
-    point: 4, // 4
-    // coin,  // reserved
-    ground: 1, // 1
-    player: 5, // 5 .
-};
 function findIndexofMapData(data, target) {
-    if (!data) return [-1, -1];
-    return data.reduce(
-        (a, b, i) => {
-            const result = b.findIndex(v => v === target);
-            if (result !== -1) {
-                return [i, result];
-            }
-            if (a[0] !== -1 && a[1] !== -1) {
-                return a;
-            }
-            return [-1, -1];
-        },
-        [-1, -1]
-    );
+	if (!data) return [-1, -1];
+	return data.reduce(
+		(a, b, i) => {
+			const result = b.findIndex(v => v === target);
+			if (result !== -1) {
+				return [i, result];
+			}
+			if (a[0] !== -1 && a[1] !== -1) {
+				return a;
+			}
+			return [-1, -1];
+		},
+		[-1, -1],
+	);
 }
 
 function exchange(a, b, getter) {
-    const data = _.cloneDeep(getter);
-    data[a[0]][a[1]] = objType.ground;
-    data[b[0]][b[1]] = objType.player;
-    return data;
+	const data = _.cloneDeep(getter);
+	[data[a[0]][a[1]], data[b[0]][b[1]]] = [data[b[0]][b[1]], data[a[0]][a[1]]];
+	return data;
+}
+
+function move(moveDirection, playerPosition, mapData, setMapData) {
+	let a, b;
+	let [x, y] = playerPosition;
+	switch (moveDirection) {
+		case MoveDirection.up:
+			a = -1;
+			b = 0;
+			break;
+		case MoveDirection.down:
+			a = 1;
+			b = 0;
+			break;
+		case MoveDirection.left:
+			a = 0;
+			b = -1;
+			break;
+		case MoveDirection.right:
+			a = 0;
+			b = 1;
+			break;
+	}
+
+	let [nx, ny] = [x + a, y + b];
+	const dest = mapData[nx][ny];
+	if (dest !== ObjType.block) {
+		if (dest === ObjType.ground) {
+			setMapData(exchange([x, y], [nx, ny], mapData));
+		} else if (dest === ObjType.box) {
+			// see if box can be push
+			const [nnx, nny] = [nx + a, ny + b];
+			if (mapData[nnx][nny] === ObjType.ground) {
+				if (mapData[x][y] === ObjType.point + ObjType.player) {
+					const newData = _.cloneDeep(mapData);
+					newData[nnx][nny] = ObjType.box;
+					newData[nx][ny] = ObjType.player;
+					newData[x][y] = ObjType.point;
+					setMapData(newData);
+				}
+
+				setMapData(
+					exchange(
+						[x, y],
+						[nx, ny],
+						exchange([nnx, nny], [nx, ny], mapData),
+					),
+				);
+			} else if (mapData[nnx][nny] === ObjType.point) {
+				const newData = _.cloneDeep(mapData);
+				newData[nnx][nny] = ObjType.box + ObjType.point;
+				newData[nx][ny] = ObjType.player;
+				if (newData[x][y] === ObjType.point + ObjType.player) {
+					newData[x][y] = ObjType.point;
+				} else {
+					newData[x][y] = ObjType.ground;
+				}
+				setMapData(newData);
+			}
+		} else if (dest === ObjType.point) {
+			// step on the point
+			const newData = _.cloneDeep(mapData);
+			newData[nx][ny] = ObjType.point + ObjType.player;
+			newData[x][y] = ObjType.ground;
+			setMapData(newData);
+		}
+	}
 }
 
 function useMove(keys, mapData, setMapData, playerPosition) {
-    useEffect(() => {
-        if (!mapData) return;
+	useEffect(() => {
+		if (!mapData) return;
 
-        const [upKey, downKey, leftKey, rightKey] = keys;
-        let [x, y] = playerPosition;
-        if (upKey > 0) {
-            let [nx, ny] = [x - 1, y];
-            console.log(x, y, nx, ny);
-            const dest = mapData[nx][ny];
-            if (dest !== objType.block) {
-                console.log(x, y, nx, ny);
-                if (dest === objType.ground) {
-                    // setMapData(exchange([x, y], [nx, ny], mapData.data));
-                    console.log(x, y, nx, ny);
-                }
-            }
-        }
-        if (downKey > 0) {
-            let [nx, ny] = [x - 1, y];
-        }
-        if (leftKey > 0) {
-            let [nx, ny] = [x - 1, y];
-        }
-        if (rightKey > 0) {
-            let [nx, ny] = [x - 1, y];
-        }
-    }, [keys, mapData, setMapData, playerPosition]);
+		const [upKey, downKey, leftKey, rightKey] = keys;
+
+		if (upKey > 0) {
+			move(MoveDirection.up, playerPosition, mapData, setMapData);
+		}
+		if (downKey > 0) {
+			move(MoveDirection.down, playerPosition, mapData, setMapData);
+		}
+		if (leftKey > 0) {
+			move(MoveDirection.left, playerPosition, mapData, setMapData);
+		}
+		if (rightKey > 0) {
+			move(MoveDirection.right, playerPosition, mapData, setMapData);
+		}
+	}, [keys]);
 }
 
 function useDatacenter() {
-    const [dataCenter, setDataCenter] = useState(null);
-    useEffect(() => {
-        getMapData().then(data => {
-            setDataCenter(data);
-        });
-        return () => setDataCenter(null);
-    }, []);
-    return dataCenter;
+	const [dataCenter, setDataCenter] = useState(null);
+	useEffect(() => {
+		getMapData().then(data => {
+			setDataCenter(data);
+		});
+		return () => setDataCenter(null);
+	}, []);
+	return dataCenter;
 }
 
 function useGamedata(dataCenter, level) {
-    const [unit, setUnit] = useState(null);
-    const [width, setWidth] = useState(null);
-    const [height, setHeight] = useState(null);
-    const [mapData, setMapData] = useState(null);
+	const [unit, setUnit] = useState(null);
+	const [width, setWidth] = useState(null);
+	const [height, setHeight] = useState(null);
+	const [mapData, setMapData] = useState(null);
 
-    useEffect(() => {
-        if (!!dataCenter && !!level) {
-            setUnit(dataCenter[level - 1].unit);
-            setWidth(dataCenter[level - 1].width);
-            setHeight(dataCenter[level - 1].height);
-            setMapData(dataCenter[level - 1].data);
-        }
-        return () => {
-            setUnit(null);
-            setWidth(null);
-            setHeight(null);
-            setMapData(null);
-        };
-    }, [dataCenter, level]);
+	useEffect(() => {
+		if (!!dataCenter && !!level) {
+			setUnit(dataCenter[level - 1].unit);
+			setWidth(dataCenter[level - 1].width);
+			setHeight(dataCenter[level - 1].height);
+			setMapData(dataCenter[level - 1].data);
+		}
+		return () => {
+			setUnit(null);
+			setWidth(null);
+			setHeight(null);
+			setMapData(null);
+		};
+	}, [dataCenter, level]);
 
-    return [unit, width, height, mapData, setMapData];
+	return [unit, width, height, mapData, setMapData];
 }
 
 function useRenderdata(mapData, tiles) {
-    const renderData = useMemo(() => {
-        if (!!mapData && mapData instanceof Array) {
-            if (!tiles) return;
-            // setRenderData(
-
-            // );
-            return mapData.map(a => {
-                return a.map(b => dataToTile(b, tiles));
-            });
-        }
-        return null;
-        // return () => setRenderData(null);
-    }, [mapData, tiles]);
-    return renderData;
+	const renderData = useMemo(() => {
+		if (!!mapData && mapData instanceof Array) {
+			if (!tiles) return;
+			return mapData.map(a => {
+				return a.map(b => dataToTile(b, tiles));
+			});
+		}
+		return null;
+		// return () => setRenderData(null);
+	}, [mapData, tiles]);
+	return renderData;
 }
 
 function useTiles(level) {
-    const [tiles, setTiles] = useState();
-    useEffect(() => {
-        setTiles(genTiles());
-    }, [level]);
-    return tiles;
+	const [tiles, setTiles] = useState();
+	useEffect(() => {
+		setTiles(genTiles());
+	}, [level]);
+	return tiles;
 }
 
 function usePlayerPosition(mapData) {
-    const [playerPosition, setPlayerPosition] = useState([-1, -1]);
-    useEffect(() => {
-        if (!mapData) return;
-        setPlayerPosition(findIndexofMapData(mapData, objType.player));
-    }, [mapData, playerPosition]);
-    return playerPosition;
+	const [playerPosition, setPlayerPosition] = useState([-1, -1]);
+	useEffect(() => {
+		if (!mapData) return;
+		setPlayerPosition(findIndexofMapData(mapData, ObjType.player));
+	}, [mapData]);
+	return playerPosition;
 }
 
 export const Board = () => {
-    const dataCenter = useDatacenter();
-    const [level, setLevel] = useState(2);
-    const [unit, width, height, mapData, setMapData] = useGamedata(
-        dataCenter,
-        level
-    );
-    const tiles = useTiles(level);
-    const renderData = useRenderdata(mapData, tiles);
+	const dataCenter = useDatacenter();
+	const [level, setLevel] = useState(1);
+	const [unit, width, height, mapData, setMapData] = useGamedata(
+		dataCenter,
+		level,
+	);
+	const tiles = useTiles(level);
+	const renderData = useRenderdata(mapData, tiles);
 
-    const playerPosition = usePlayerPosition(mapData);
-    const [gameState, setGameState] = useState();
-    const [playerOrientation, setPlayerOrientation] = useState(
-        PlayerOrientation.down
-    );
+	const playerPosition = usePlayerPosition(mapData);
+	const [gameState, setGameState] = useState();
+	const [playerOrientation, setPlayerOrientation] = useState(
+		PlayerOrientation.down,
+	);
 
-    const upKey = useKey(KeyCode.up);
-    const downKey = useKey(KeyCode.down);
-    const leftKey = useKey(KeyCode.left);
-    const rightKey = useKey(KeyCode.right);
+	const upKey = useKey(KeyCode.up);
+	const downKey = useKey(KeyCode.down);
+	const leftKey = useKey(KeyCode.left);
+	const rightKey = useKey(KeyCode.right);
 
-    // setMapData
+	// setMapData
+	const keys = useMemo(() => [upKey, downKey, leftKey, rightKey], [
+		upKey,
+		downKey,
+		leftKey,
+		rightKey,
+	]);
 
-    useMove(
-        [upKey, downKey, leftKey, rightKey],
-        mapData,
-        setMapData,
-        playerPosition
-    ); // move the charactor
+	useMove(keys, mapData, setMapData, playerPosition); // move the charactor
 
-    // eslint-disable-next-line no-console
-    // console.log(upKey, downKey, leftKey, rightKey);
-    // console.log(renderData, mapData);
+	// eslint-disable-next-line no-console
+	// console.log(upKey, downKey, leftKey, rightKey);
+	// console.log(renderData, mapData);
 
-    if (!renderData) return <div />;
+	if (!renderData) return <div />;
 
-    return renderData.map((r, i) => (
-        <div className="row" key={i}>
-            {r.map((v, i) => {
-                return <Cell key={i} size={unit} data={v} />;
-            })}
-        </div>
-    ));
+	return renderData.map((r, i) => (
+		<div className="row" key={i}>
+			{r.map((v, i) => {
+				return <Cell key={i} size={unit} data={v} />;
+			})}
+		</div>
+	));
 };

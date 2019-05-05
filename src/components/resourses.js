@@ -260,8 +260,9 @@ export function dataToTile(num, tiles) {
 		case ObjType.point + ObjType.box:
 			re = [tiles.box, tiles.point, tiles.ground];
 			break;
-		case ObjType.point + ObjType.player:
-			re = [tiles.player, tiles.point, tiles.ground];
+		case ObjType.point + ObjType.player: // ObjType.point + ObjType.player
+			re = [tiles.player.down[0], tiles.point, tiles.ground];
+			break; // always remember the break in last case!
 		default:
 			re = '';
 			break;

@@ -36,7 +36,7 @@ function useKey(concernedKey, gap) {
 
 	let inter = null;
 
-	if (!gap) gap = 500;
+	if (!gap) gap = 300;
 
 	const keydownHandler = function(ev) {
 		// console.log(inter, ev.code, concernedKey);
@@ -117,29 +117,62 @@ function move(moveDirection, playerPosition, mapData, setMapData) {
 	}
 
 	let [nx, ny] = [x + a, y + b];
-	const dest = mapData[nx][ny];
+
+	let dest = -1;
+	if (
+		nx >= mapData.length ||
+		nx < 0 ||
+		(ny >= mapData[nx].length || ny < 0)
+	) {
+		dest = -1;
+	} else {
+		dest = mapData[nx][ny];
+	}
+
 	if (dest !== ObjType.block) {
+		// it's possible to be ground, point(add together) and box
+
+		if (dest === -1) return;
+
 		if (dest === ObjType.ground) {
 			setMapData(exchange([x, y], [nx, ny], mapData));
-		} else if (dest === ObjType.box) {
+		} else if (
+			dest === ObjType.box ||
+			dest === ObjType.box + ObjType.point
+		) {
+			//
+
 			// see if box can be push
 			const [nnx, nny] = [nx + a, ny + b];
 			if (mapData[nnx][nny] === ObjType.ground) {
-				if (mapData[x][y] === ObjType.point + ObjType.player) {
-					const newData = _.cloneDeep(mapData);
-					newData[nnx][nny] = ObjType.box;
-					newData[nx][ny] = ObjType.player;
-					newData[x][y] = ObjType.point;
-					setMapData(newData);
-				}
+				// ground in front of the box, which can be pushed
 
-				setMapData(
-					exchange(
-						[x, y],
-						[nx, ny],
-						exchange([nnx, nny], [nx, ny], mapData),
-					),
-				);
+				const newData = _.cloneDeep(mapData);
+				newData[nnx][nny] = ObjType.box;
+
+				if (mapData[x][y] === ObjType.point + ObjType.player) {
+					if (dest === ObjType.box + ObjType.point) {
+						newData[nx][ny] = ObjType.player + ObjType.point;
+					} else {
+						newData[nx][ny] = ObjType.player;
+					}
+					newData[x][y] = ObjType.point;
+				} else {
+					// setMapData(
+					// 	exchange(
+					// 		[x, y],
+					// 		[nx, ny],
+					// 		exchange([nnx, nny], [nx, ny], mapData),
+					// 	),
+					// );
+					newData[x][y] = ObjType.ground;
+					if (dest === ObjType.box + ObjType.point) {
+						newData[nx][ny] = ObjType.player + ObjType.point;
+					} else {
+						newData[nx][ny] = ObjType.player;
+					}
+				}
+				setMapData(newData);
 			} else if (mapData[nnx][nny] === ObjType.point) {
 				const newData = _.cloneDeep(mapData);
 				newData[nnx][nny] = ObjType.box + ObjType.point;
@@ -152,12 +185,26 @@ function move(moveDirection, playerPosition, mapData, setMapData) {
 				setMapData(newData);
 			}
 		} else if (dest === ObjType.point) {
-			// step on the point
+			// will step on the point after move
 			const newData = _.cloneDeep(mapData);
 			newData[nx][ny] = ObjType.point + ObjType.player;
-			newData[x][y] = ObjType.ground;
+			if (mapData[x][y] === ObjType.point + ObjType.player) {
+				newData[x][y] = ObjType.point;
+			} else {
+				newData[x][y] = ObjType.ground;
+			}
 			setMapData(newData);
 		}
+		// else if (dest === ) {
+		// 	const newData = _.cloneDeep(mapData);
+		// 	newData[nx][ny] = ObjType.point + ObjType.player;
+		// 	if (mapData[x][y] === ObjType.point + ObjType.player) {
+		// 		newData[x][y] = ObjType.point;
+		// 	} else {
+		// 		newData[x][y] = ObjType.ground;
+		// 	}
+		// 	setMapData(newData);
+		// }
 	}
 }
 

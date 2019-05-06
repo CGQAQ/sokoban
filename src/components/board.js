@@ -6,7 +6,6 @@ import getMapData from '../lvl/index';
 import { Cell } from './cell';
 
 import { genTiles, dataToTile, ObjType } from './resourses';
-import { objectExpression } from '@babel/types';
 
 function useInit({ setGameData, setLevel }) {
 	useEffect(() => {
@@ -75,7 +74,24 @@ function findIndexofMapData(data, target) {
 	if (!data) return [-1, -1];
 	return data.reduce(
 		(a, b, i) => {
-			const result = b.findIndex(v => v === target);
+			const result = b.findIndex(v => {
+				// v === target
+				if (v === 5) console.log('w');
+				if (target instanceof Array) {
+					for (let item in target) {
+						if (item === v) {
+							console.log('0.0');
+							return true;
+						}
+					}
+					return false;
+				} else {
+					if (v === target) {
+						return true;
+					}
+					return false;
+				}
+			});
 			if (result !== -1) {
 				return [i, result];
 			}
@@ -88,11 +104,11 @@ function findIndexofMapData(data, target) {
 	);
 }
 
-function exchange(a, b, getter) {
-	const data = _.cloneDeep(getter);
-	[data[a[0]][a[1]], data[b[0]][b[1]]] = [data[b[0]][b[1]], data[a[0]][a[1]]];
-	return data;
-}
+// function exchange(a, b, getter) {
+// 	const data = _.cloneDeep(getter);
+// 	[data[a[0]][a[1]], data[b[0]][b[1]]] = [data[b[0]][b[1]], data[a[0]][a[1]]];
+// 	return data;
+// }
 
 function move(moveDirection, playerPosition, mapData, setMapData) {
 	let a, b;
@@ -114,6 +130,8 @@ function move(moveDirection, playerPosition, mapData, setMapData) {
 			a = 0;
 			b = 1;
 			break;
+		default:
+			break;
 	}
 
 	let [nx, ny] = [x + a, y + b];
@@ -124,6 +142,7 @@ function move(moveDirection, playerPosition, mapData, setMapData) {
 		nx < 0 ||
 		(ny >= mapData[nx].length || ny < 0)
 	) {
+		console.log(nx, mapData.length, ny, mapData.length);
 		dest = -1;
 	} else {
 		dest = mapData[nx][ny];
@@ -132,16 +151,24 @@ function move(moveDirection, playerPosition, mapData, setMapData) {
 	if (dest !== ObjType.block) {
 		// it's possible to be ground, point(add together) and box
 
+		console.log('???', dest);
 		if (dest === -1) return;
 
 		if (dest === ObjType.ground) {
-			setMapData(exchange([x, y], [nx, ny], mapData));
+			console.log('you are right');
+			const newData = _.cloneDeep(mapData);
+			newData[nx][ny] = ObjType.player;
+			if (mapData[x][y] === ObjType.point + ObjType.player) {
+				newData[x][y] = ObjType.point;
+			} else {
+				newData[x][y] = ObjType.ground;
+			}
+			// setMapData(exchange([x, y], [nx, ny], mapData));
+			setMapData(newData);
 		} else if (
 			dest === ObjType.box ||
 			dest === ObjType.box + ObjType.point
 		) {
-			//
-
 			// see if box can be push
 			const [nnx, nny] = [nx + a, ny + b];
 			if (mapData[nnx][nny] === ObjType.ground) {
@@ -290,7 +317,12 @@ function usePlayerPosition(mapData) {
 	const [playerPosition, setPlayerPosition] = useState([-1, -1]);
 	useEffect(() => {
 		if (!mapData) return;
-		setPlayerPosition(findIndexofMapData(mapData, ObjType.player));
+		setPlayerPosition(
+			findIndexofMapData(mapData, [
+				ObjType.player,
+				ObjType.player + ObjType.point,
+			]),
+		);
 	}, [mapData]);
 	return playerPosition;
 }

@@ -4,7 +4,7 @@ import './cell.css';
 function dataToIMG(data) {
 	if (data instanceof Array) {
 		if (data.length >= 3) {
-			console.log(data);
+			// console.log(data);
 		}
 
 		return data.reduce((f, s) => `${f}, url(${s})`, '').substr(2);

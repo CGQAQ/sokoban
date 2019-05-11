@@ -27,6 +27,28 @@ export const Board = () => {
     const [lastMove, setLastMove] = useState(KeyCode.down);
 
     useEffect(() => {
+        window.game = new Proxy(
+            {},
+            {
+                get(target, prop, receiver) {
+                    if (prop === 'level') {
+                        return level;
+                    } else {
+                        Reflect.get(...arguments);
+                    }
+                },
+                set(obj, prop, value) {
+                    if (prop === 'level' && value >= 1 && value <= total) {
+                        setLevel(value);
+                    } else {
+                        return Reflect.set(...arguments);
+                    }
+                }
+            }
+        );
+    }, [total]);
+
+    useEffect(() => {
         if (points === 0) {
             if (level >= total) {
                 alert(
